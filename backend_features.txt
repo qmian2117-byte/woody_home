@@ -1,0 +1,136 @@
+================================================================================
+GLOSSY WOODS (https://www.glossywoods.shop/)
+COMPREHENSIVE BACKEND ARCHITECTURE & FEATURE SPECIFICATION
+================================================================================
+
+1. CORE SYSTEM ARCHITECTURE & HOSTING
+--------------------------------------------------------------------------------
+- Platform Type: Shopify Cloud SaaS (Storefront Renderer)
+- Shop ID: 100528128344
+- Internal Store Domain: ihkp36-ex.myshopify.com
+- Primary Domain: www.glossywoods.shop
+- Compute Infrastructure: Google Cloud Platform (gcp-us-west1 region)
+- CDN & Edge Network: Cloudflare + Shopify Global Edge CDN (cdn.shopify.com)
+- Templating & Rendering: Shopify Liquid Engine 2.0
+- Active Theme: glossy-woods-theme-updated-10aug2026-r13 (Theme ID: 196824924504)
+- Operating Currency & Locale: PKR (Rate: 1.0) / Primary Market: Pakistan
+- Merchant Contact: +923326457322 / customer service desk
+
+================================================================================
+2. EXHAUSTIVE BACKEND FEATURE SPECIFICATION (EXTRACTED 1-BY-1)
+================================================================================
+
+FEATURE 1: PRODUCT INFORMATION MANAGEMENT (PIM) & CATALOG API
+- API Endpoints:
+  * GET /products.json
+  * GET /products/{product-handle}.js
+  * GET /products/{product-handle}.json
+- Capabilities:
+  * SKU Management: Tracks unique SKUs per product variant (e.g., GW-HXL-001, GW-PNL-001, GW-DER-010, GW-JEP-009).
+  * Multi-Variant Hierarchy: Manages variant IDs, option attributes (e.g., size, animal type: Deer, Horse, Swan, Elephant, Lion).
+  * Dynamic Pricing: Manages active selling price ("price") and discounted strike-through price ("compare_at_price").
+  * Stock & Inventory State: Live boolean inventory flags ("available: true/false"), backorder policies, and shipping requirement flags ("requires_shipping: true").
+  * Rich Media Image Processor: Automatically generates responsive image srcsets and WebP conversions from uploaded raw assets.
+
+--------------------------------------------------------------------------------
+FEATURE 2: COLLECTIONS & TAXONOMY ENGINE
+- API Endpoints:
+  * GET /collections.json
+  * GET /collections/{collection-handle}/products.json
+- Capabilities:
+  * Dynamic/Smart Collections: Rule-based category sorting (e.g., Air Crafts, Cars, Lamps, Home Decor).
+  * Custom Sorting & Ordering: Best-selling, price ascending/descending, alphabetical, and creation date filters.
+  * Tag-Based Aggregation: Indexes product tags for faceted navigation and breadcrumb hierarchical schemas.
+
+--------------------------------------------------------------------------------
+FEATURE 3: AJAX CART & STATEFUL SESSION ENGINE
+- API Endpoints:
+  * GET /cart.js - Fetches real-time shopping cart payload.
+  * POST /cart/add.js - Adds items with variant IDs and custom line-item properties.
+  * POST /cart/change.js - Updates line-item quantities or removes products.
+  * POST /cart/update.js - Updates cart notes, attributes, and bulk updates.
+  * POST /cart/clear.js - Flushes the current session cart.
+- Capabilities:
+  * Persistent Browser Sessions: Tracks user state via encrypted cookies (_shopify_s, _shopify_y).
+  * Custom Line-Item Properties: Supports custom engraving/name text payloads for personalized products (e.g., Personalized Name LED Lamps).
+  * Cart Discount Resolution: Auto-calculates cart-level discounts, subtotal prices, and tax estimations.
+
+--------------------------------------------------------------------------------
+FEATURE 4: PREDICTIVE SEARCH & REAL-TIME SUGGESTION ENGINE
+- API Endpoints:
+  * GET /search/suggest.json?q={keyword}&resources[type]=product
+- Capabilities:
+  * Low-Latency Search Suggestion: Debounced keyword lookup querying product titles, descriptions, and tags.
+  * Rich Payload Response: Returns product title, direct URL handle, formatted price, compare-at price, availability, and high-res thumbnail.
+  * Search Analytics Integration: Feeds search queries directly into ad conversion tracking.
+
+--------------------------------------------------------------------------------
+FEATURE 5: CHECKOUT & PAYMENT PROCESSING PIPELINE
+- Endpoints:
+  * /checkouts/...
+  * /.well-known/ucp
+  * /checkouts/{id}/thank_you
+- Capabilities:
+  * Cash On Delivery (COD) Engine: Dedicated cash-on-delivery payment routing optimized for Pakistani domestic ecommerce.
+  * Portable Wallets API: Dynamic checkout buttons initialized via portable-wallets.en.js.
+  * Shop Pay Accelerated Checkout: One-click buyer checkout integration (ShopifyPay.apiHost = "shop.app/pay").
+  * 3D Secure Card Verification: Apple Pay and card capability checking ("supports3DS" merchant validation).
+  * PayPal v4 In-Context Flow: Synchronous currency handling for international customers.
+  * Buyer Consent Subsystem: Dynamic disclosure and acceptance tracking for subscription terms and terms of service.
+
+--------------------------------------------------------------------------------
+FEATURE 6: AI / MCP (MODEL CONTEXT PROTOCOL) INTEGRATION
+- API Endpoint:
+  * POST https://www.glossywoods.shop/api/mcp
+- Capabilities:
+  * WebMCP Storefront Adapter: Implements the modern Model Context Protocol for automated AI interaction.
+  * Exposed AI Tool: search_shop_policies_and_faqs
+  * Natural Language Processing: Allows external AI agents to query store policies, return/refund terms, shipping timelines, contact details, and operating hours.
+
+--------------------------------------------------------------------------------
+FEATURE 7: CUSTOMER IDENTITY & ACCESS MANAGEMENT (IAM)
+- Endpoints:
+  * /account/login
+  * /account/register
+  * /account/recover
+- Capabilities:
+  * New Customer Accounts (NCA): Frictionless login powered by Shopify Shop Login (SignInWithShop).
+  * Federated Credential Management (FedCM): Browser-level identity federation (init-fed-cm) without traditional password friction.
+  * Session Form Resiliency: Recovers and repopulates form inputs using sessionStorage (form_key and __shopify_v) if validation errors occur.
+
+--------------------------------------------------------------------------------
+FEATURE 8: SECURITY, ANTI-BOT & FRAUD MITIGATION
+- Capabilities:
+  * hCaptcha Enterprise Integration: Protects registration, guest checkout, login, and contact forms via ce_storefront_forms_captcha_hcaptcha.
+  * CSRF / Anti-Forgery Tokenization: Validates form submission authenticity using dynamic cryptographic keys.
+  * Edge DDoS & Rate-Limiting: Cloudflare edge firewall filtering automated scrapers and brute-force attempts.
+
+--------------------------------------------------------------------------------
+FEATURE 9: SERVER-SIDE TELEMETRY, WEB PIXELS & CONVERSION TRACKING
+- Capabilities:
+  * Shopify Web Pixels Manager (WPM): Isolated strict sandbox executing tracking events without degrading main-thread performance.
+  * Meta / Facebook Conversions API (CAPI): Dual-layer tracking (browser client-side pixel + Server-to-Server CAPI) using Pixel IDs: 979239618616293 and 1441063594497661.
+  * Google Tag & Google Ads: Real-time event dispatches for view_item, add_to_cart, begin_checkout, and purchase (IDs: AW-18377700810, GT-NCLX64LX).
+  * TikTok Pixel Integration: Event streaming to TikTok Ads (Pixel: DAELOLBC77U896DQESTG).
+  * Monorail Event Streaming: Ingests real-time buyer abandonment telemetry (online_store_buyer_site_abandonment/1.1) to monorail-edge.shopifysvc.com.
+  * Perf-Kit Application Profiler: Captures render latency, long animation frames, and transmits beacons to /api/collect.
+
+--------------------------------------------------------------------------------
+FEATURE 10: WHATSAPP CONVERSATIONAL COMMERCE INTEGRATION
+- Integration Point:
+  * Target Number: +923326457322
+- Capabilities:
+  * Customization Proof Workflow: Connects buyers of personalized wooden lamps to customer support for live design mockups and name proofing.
+  * Manual Order Confirmation: Bypasses complex checkouts for direct-to-WhatsApp order booking and COD verification.
+
+================================================================================
+3. REPLICATION ROADMAP (IF BUILDING A CUSTOM CLONE)
+================================================================================
+To build an identical custom backend from scratch, implement these components:
+1. Product Microservice: Node.js / Python FastAPI with PostgreSQL (Products, SKUs, Variants).
+2. Fast In-Memory Cart: Redis session store with line-item property attachments.
+3. Search Microservice: Meilisearch or Elasticsearch for instant fuzzy auto-complete.
+4. Checkout & Order Engine: Multi-step checkout with Cash On Delivery (COD) status tracking.
+5. Notification & WhatsApp Webhook: Automated order confirmation and tracking alerts.
+6. Server-Side CAPI Dispatcher: Node.js worker sending events directly to Meta & Google Ads APIs.
+================================================================================

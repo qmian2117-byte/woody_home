@@ -1,0 +1,27 @@
+---
+description: Preserve the service-site CMS architecture for route wrappers, content modules, style modules, page UI, slug routes, and custom 404 files.
+alwaysApply: true
+---
+
+# Service-Site CMS Architecture Rule
+
+Always apply this rule when working on this repository.
+
+## Operational Requirement
+Before performing page creation, page refactors, dynamic route work, CMS/content/style edits, not-found changes, layout edits, section changes, or shared service-site component work, you must read and follow:
+- `.cursor/skills/service-site-cms-architecture/SKILL.md` (Operational instructions)
+- `CMS_ARCHITECTURE_PROMPT.md` (Full architectural reference and source of truth)
+
+## Mandatory Architectural Patterns
+1. **Lean Route Wrappers (`src/app/**/page.tsx`)**: Keep wrapper files lean. Static wrappers import `content.ts`, export metadata from `content.seo`, and render UI from `@/page/...`. Dynamic wrappers await `params: Promise<{ slug: string }>`, lookup canonical items, call `notFound()` for missing records, and pass resolved data to `@/page/...`.
+2. **Page UI Modules (`src/page/**.tsx`)**: All page layouts, section markup, and interactive features live here. Only add `"use client"` when state or browser APIs are required. Never place large page JSX inside `src/app` wrappers.
+3. **Route CMS Data (`content.ts`)**: Co-located CMS files own text, titles, features, FAQs, and SEO. Canonical arrays (`services`, `serviceAreaLocations`, `blogPosts`) reside in listing routes (`src/app/services/content.ts`, `src/app/service-area/content.ts`, `src/app/blog/content.ts`). Do not duplicate canonical collections in UI files.
+4. **Route Style Maps (`style.tsx`)**: Tailwind class maps and CSS variable/background helpers live in co-located `style.tsx` files. Shared layout maps live in `src/app/_shared/style.tsx`.
+5. **Exact Custom 404 Architecture**:
+   - `src/app/not-found.tsx` (App Router wrapper)
+   - `src/app/not-found/content.ts` (Error copy & SEO)
+   - `src/app/not-found/style.tsx` (Styling classes)
+   - `src/page/not-found.tsx` (UI presentation)
+   Never replace this with only `src/app/not-found/page.tsx`.
+6. **Slug Systems**: Dynamic routes (`/services/[slug]`, `/service-area/[slug]`, `/blog/[slug]`) must generate static params, dynamic metadata, lookup canonical items, and handle `notFound()`.
+7. **No Generated File Edits**: Never edit `.next`, build caches, or generated output files directly.

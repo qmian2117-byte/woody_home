@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "node .cursor/hooks/service-site-cms-architecture-reminder.cjs",
+        "timeout": 5,
+        "failClosed": false
+      }
+    ]
+  }
+}

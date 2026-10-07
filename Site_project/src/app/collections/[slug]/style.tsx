@@ -1,0 +1,18 @@
+export const collectionDetailStyles = {
+  section: "min-h-screen bg-[#fafaf9] py-12 md:py-20",
+  container: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+  breadcrumb: "flex items-center gap-2 text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-8",
+  breadcrumbLink: "hover:text-[#C9A84C] transition-colors",
+  breadcrumbCurrent: "text-neutral-900 font-bold",
+  header: "text-center max-w-3xl mx-auto mb-14",
+  eyebrow: "text-xs uppercase tracking-[0.25em] font-bold text-[#C9A84C] mb-2 block",
+  heading: "text-3xl sm:text-4xl md:text-5xl font-normal font-[family-name:var(--font-playfair)] text-[#111111] mb-4",
+  description: "text-neutral-600 text-sm sm:text-base leading-relaxed",
+  cardWrap: "max-w-xl mx-auto bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden p-6 md:p-8 text-center flex flex-col items-center",
+  imageWrap: "w-full max-w-sm aspect-square rounded-xl overflow-hidden mb-6 bg-neutral-50 flex items-center justify-center border border-neutral-100",
+  image: "w-full h-full object-cover",
+  badge: "inline-block px-3 py-1 bg-neutral-100 text-neutral-800 rounded-full text-xs font-bold uppercase tracking-wider mb-4",
+  ctaRow: "flex flex-wrap items-center justify-center gap-4 mt-6 w-full",
+  primaryBtn: "inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#111111] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#C9A84C] hover:text-[#111111] transition-all",
+  secondaryBtn: "inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-neutral-300 text-neutral-800 text-xs font-bold uppercase tracking-wider hover:border-[#111111] transition-all",
+};
