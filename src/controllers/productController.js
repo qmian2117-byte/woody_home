@@ -43,10 +43,12 @@ export const getProducts = async (req, res, next) => {
     }
 
     // Sorting
-    if (sort === 'price_asc') {
-      query = query.order('created_at', { ascending: false });
-    } else if (sort === 'price_desc') {
-      query = query.order('created_at', { ascending: false });
+    if (sort === 'oldest') {
+      query = query.order('created_at', { ascending: true });
+    } else if (sort === 'title_asc') {
+      query = query.order('title', { ascending: true });
+    } else if (sort === 'title_desc') {
+      query = query.order('title', { ascending: false });
     } else {
       query = query.order('created_at', { ascending: false });
     }
@@ -59,7 +61,7 @@ export const getProducts = async (req, res, next) => {
     if (error) throw error;
 
     // Format products for clean Next.js ingestion (matching ProductCardProps)
-    const formattedProducts = (products || []).map(p => {
+    let formattedProducts = (products || []).map(p => {
       const defaultVariant = p.variants?.[0] || null;
       const sortedImages = (p.images || []).sort((a, b) => a.position - b.position);
       const priceNum = defaultVariant ? parseFloat(defaultVariant.price) : 0;
@@ -93,6 +95,13 @@ export const getProducts = async (req, res, next) => {
         tags: (p.tags || []).map(t => t.tag)
       };
     });
+
+    // In-memory price sorting if requested
+    if (sort === 'price_asc') {
+      formattedProducts.sort((a, b) => a.priceRaw - b.priceRaw);
+    } else if (sort === 'price_desc') {
+      formattedProducts.sort((a, b) => b.priceRaw - a.priceRaw);
+    }
 
     return successResponse(res, 'Products retrieved successfully', {
       products: formattedProducts,
@@ -365,3 +374,173 @@ export const createProduct = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * PUT/PATCH /api/admin/products/:id
+ */
+export const updateProduct = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      slug,
+      category_id,
+      body_html,
+      product_type,
+      vendor,
+      is_published
+    } = req.body;
+
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (slug !== undefined) updates.slug = slug;
+    if (category_id !== undefined) updates.category_id = category_id;
+    if (body_html !== undefined) updates.body_html = body_html;
+    if (product_type !== undefined) updates.product_type = product_type;
+    if (vendor !== undefined) updates.vendor = vendor;
+    if (is_published !== undefined) updates.is_published = is_published;
+    updates.updated_at = new Date().toISOString();
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('products')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return successResponse(res, 'Product updated successfully', updated);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * DELETE /api/admin/products/:id
+ */
+export const deleteProduct = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Delete associated variants, images, tags cascadingly
+    const { error } = await supabaseAdmin
+      .from('products')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    return successResponse(res, 'Product deleted successfully', null);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PATCH /api/admin/variants/:id/inventory
+ */
+export const updateVariantInventory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { inventory_quantity, price, compare_at_price, is_available } = req.body;
+
+    const updates = {};
+    if (inventory_quantity !== undefined) {
+      updates.inventory_quantity = inventory_quantity;
+      updates.is_available = inventory_quantity > 0;
+    }
+    if (is_available !== undefined) updates.is_available = is_available;
+    if (price !== undefined) updates.price = price;
+    if (compare_at_price !== undefined) updates.compare_at_price = compare_at_price;
+    updates.updated_at = new Date().toISOString();
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('product_variants')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return successResponse(res, 'Variant inventory updated', updated);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/admin/categories
+ */
+export const createCategory = async (req, res, next) => {
+  try {
+    const { name, slug, description, image_url } = req.body;
+    if (!name || !slug) {
+      return errorResponse(res, 'Category name and slug are required', null, 400);
+    }
+
+    const { data: category, error } = await supabaseAdmin
+      .from('categories')
+      .insert([{ name, slug, description, image_url }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return successResponse(res, 'Category created successfully', category, 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /api/admin/categories/:id
+ */
+export const updateCategory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, slug, description, image_url } = req.body;
+
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (slug !== undefined) updates.slug = slug;
+    if (description !== undefined) updates.description = description;
+    if (image_url !== undefined) updates.image_url = image_url;
+    updates.updated_at = new Date().toISOString();
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('categories')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return successResponse(res, 'Category updated successfully', updated);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * DELETE /api/admin/categories/:id
+ */
+export const deleteCategory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabaseAdmin
+      .from('categories')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    return successResponse(res, 'Category deleted successfully', null);
+  } catch (err) {
+    next(err);
+  }
+};
+

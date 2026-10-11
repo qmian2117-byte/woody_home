@@ -7,11 +7,15 @@ import {
   apiUpdateCartItem,
   apiRemoveCartItem,
   apiClearCart,
-  type ApiCart
+  apiApplyCoupon,
+  apiRemoveCoupon,
+  type ApiCart,
+  type ApplyCouponResult
 } from '@/lib/api';
 
 interface CartContextType {
   cart: ApiCart | null;
+  coupon: ApplyCouponResult | null;
   isOpen: boolean;
   isLoading: boolean;
   openCart: () => void;
@@ -20,6 +24,8 @@ interface CartContextType {
   updateItem: (itemId: string, quantity: number, customProperties?: Record<string, string>) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   clear: () => Promise<void>;
+  applyCouponCode: (code: string) => Promise<ApplyCouponResult>;
+  removeCouponCode: () => Promise<void>;
   refreshCart: () => Promise<void>;
 }
 
@@ -27,6 +33,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<ApiCart | null>(null);
+  const [coupon, setCoupon] = useState<ApplyCouponResult | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -82,6 +89,30 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       const updatedCart = await apiClearCart();
       setCart(updatedCart);
+      setCoupon(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyCouponCode = async (code: string) => {
+    setIsLoading(true);
+    try {
+      const res = await apiApplyCoupon(code);
+      setCoupon(res);
+      await refreshCart();
+      return res;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeCouponCode = async () => {
+    setIsLoading(true);
+    try {
+      await apiRemoveCoupon();
+      setCoupon(null);
+      await refreshCart();
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +122,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     <CartContext.Provider
       value={{
         cart,
+        coupon,
         isOpen,
         isLoading,
         openCart,
@@ -99,6 +131,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         updateItem,
         removeItem,
         clear,
+        applyCouponCode,
+        removeCouponCode,
         refreshCart
       }}
     >

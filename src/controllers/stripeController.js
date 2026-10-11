@@ -5,8 +5,7 @@ import { successResponse, errorResponse } from '../utils/apiResponse.js';
 const getStripe = () => {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key || /your|placeholder|replace/i.test(key)) {
-    // Demo fallback for testing without real key
-    return null;
+    return new Stripe('sk_test_dummy_key_for_signature_verification');
   }
   return new Stripe(key);
 };
@@ -111,9 +110,8 @@ export const createStripeSession = async (req, res, next) => {
       };
     });
 
-    // 3. Create Checkout Session
+    // 3. Create Checkout Session (Dynamic Payment Methods enabled via Stripe Dashboard)
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
       line_items,
       mode: 'payment',
       customer_email: email || undefined,
@@ -321,19 +319,25 @@ export const handleStripeWebhook = async (req, res) => {
     return res.status(400).send('Stripe is not configured');
   }
 
+  // Reject unconfigured or placeholder webhook secrets
+  if (!webhookSecret || /your|placeholder|replace/i.test(webhookSecret)) {
+    console.error('[Security Warning] Stripe webhook rejected: STRIPE_WEBHOOK_SECRET is not configured.');
+    return res.status(400).send('Webhook secret is not configured');
+  }
+
+  // Reject missing signature headers (prevent forged requests)
+  if (!sig) {
+    console.warn('[Security Warning] Webhook call rejected: Missing stripe-signature header.');
+    return res.status(400).send('Missing stripe-signature header');
+  }
+
   let event;
 
   try {
-    if (webhookSecret && !/your|placeholder|replace/i.test(webhookSecret)) {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } else {
-      // In development if no webhook secret is set, parse directly
-      event = typeof req.body === 'string' || Buffer.isBuffer(req.body) 
-        ? JSON.parse(req.body.toString()) 
-        : req.body;
-    }
+    // Strictly verify signature using raw body and Stripe SDK
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
+    console.error('[Security Alert] Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -342,17 +346,41 @@ export const handleStripeWebhook = async (req, res) => {
     const session = event.data.object;
     const sessionId = session.id;
 
+    // Reject unpaid sessions (SEC-018: Failed or canceled payments cannot produce paid orders)
+    if (session.payment_status !== 'paid') {
+      console.warn(`[Webhook Warning] Ignored session ${sessionId}: payment_status is '${session.payment_status}', not 'paid'.`);
+      return res.status(200).json({ received: true, status: 'unpaid_ignored' });
+    }
+
     try {
-      // Check if order already created
+      const eventId = event.id || `evt_${sessionId}`;
+
+      // 1. Database-Level Unique Idempotency Claim (Issue 4)
+      // Enforces database unique constraint on stripe_webhook_events(event_id, session_id)
+      const { error: claimError } = await supabaseAdmin
+        .from('stripe_webhook_events')
+        .insert([{
+          event_id: eventId,
+          session_id: sessionId,
+          event_type: event.type,
+          status: 'processing'
+        }]);
+
+      if (claimError && (claimError.code === '23505' || claimError.message?.includes('duplicate key') || claimError.message?.includes('unique'))) {
+        console.log(`[Webhook Idempotency] Event ${eventId} or Session ${sessionId} already claimed. Skipping parallel duplicate delivery.`);
+        return res.json({ received: true, duplicate: true });
+      }
+
+      // 2. Transactional check on orders table
       const { data: existingOrder } = await supabaseAdmin
         .from('orders')
         .select('id, order_number')
-        .eq('notes', `Stripe Session: ${sessionId}`)
+        .or(`stripe_session_id.eq.${sessionId},notes.eq.Stripe Session: ${sessionId}`)
         .maybeSingle();
 
       if (existingOrder) {
-        console.log(`Order already exists for session ${sessionId}`);
-        return res.json({ received: true });
+        console.log(`[Webhook Idempotency] Order ${existingOrder.order_number} already exists for session ${sessionId}. Skipping duplicate fulfillment.`);
+        return res.json({ received: true, duplicate: true });
       }
 
       const cartId = session.metadata?.cart_id;
@@ -378,6 +406,7 @@ export const handleStripeWebhook = async (req, res) => {
               title,
               sku,
               price,
+              inventory_quantity,
               product:products(id, title)
             )
           `)
@@ -407,27 +436,42 @@ export const handleStripeWebhook = async (req, res) => {
       const totalAmount = subtotal > 0 ? subtotal : (session.amount_total ? session.amount_total / 100 : 0);
       const orderNumber = generateOrderNumber();
 
-      const { data: newOrder, error: orderErr } = await supabaseAdmin
+      const orderPayload = {
+        order_number: orderNumber,
+        customer_name: customerName,
+        email: customerEmail,
+        phone: customerPhone,
+        shipping_address: shippingAddress,
+        city,
+        province,
+        postal_code: postalCode,
+        payment_method: 'CARD_STRIPE',
+        payment_status: 'paid',
+        order_status: 'confirmed',
+        subtotal: totalAmount,
+        shipping_fee: 0,
+        total_price: totalAmount,
+        notes: `Stripe Session: ${sessionId}`,
+        stripe_session_id: sessionId
+      };
+
+      let { data: newOrder, error: orderErr } = await supabaseAdmin
         .from('orders')
-        .insert([{
-          order_number: orderNumber,
-          customer_name: customerName,
-          email: customerEmail,
-          phone: customerPhone,
-          shipping_address: shippingAddress,
-          city,
-          province,
-          postal_code: postalCode,
-          payment_method: 'CARD_STRIPE',
-          payment_status: 'paid',
-          order_status: 'confirmed',
-          subtotal: totalAmount,
-          shipping_fee: 0,
-          total_price: totalAmount,
-          notes: `Stripe Session: ${sessionId}`
-        }])
+        .insert([orderPayload])
         .select()
         .single();
+
+      // Graceful fallback if stripe_session_id column has not yet migrated in staging
+      if (orderErr && orderErr.message && orderErr.message.includes('stripe_session_id')) {
+        delete orderPayload.stripe_session_id;
+        const retryResult = await supabaseAdmin
+          .from('orders')
+          .insert([orderPayload])
+          .select()
+          .single();
+        newOrder = retryResult.data;
+        orderErr = retryResult.error;
+      }
 
       if (orderErr) {
         console.error('Error inserting order via webhook:', orderErr);
@@ -435,6 +479,30 @@ export const handleStripeWebhook = async (req, res) => {
         if (orderItemsPayload.length > 0) {
           const itemsToInsert = orderItemsPayload.map(i => ({ ...i, order_id: newOrder.id }));
           await supabaseAdmin.from('order_items').insert(itemsToInsert);
+
+          // Atomic database-side inventory decrement (Issue 1)
+          for (const item of cartItems) {
+            if (item.variant?.id) {
+              const { error: rpcErr } = await supabaseAdmin.rpc('decrement_variant_inventory', {
+                p_variant_id: item.variant.id,
+                p_quantity: item.quantity
+              });
+
+              if (rpcErr) {
+                // Fallback conditional decrement
+                const currentStock = item.variant.inventory_quantity || 10;
+                const newQty = Math.max(0, currentStock - item.quantity);
+                await supabaseAdmin
+                  .from('product_variants')
+                  .update({
+                    inventory_quantity: newQty,
+                    is_available: newQty > 0
+                  })
+                  .eq('id', item.variant.id)
+                  .gte('inventory_quantity', item.quantity);
+              }
+            }
+          }
         }
 
         if (cartId) {
@@ -445,6 +513,9 @@ export const handleStripeWebhook = async (req, res) => {
     } catch (processErr) {
       console.error('Error processing checkout.session.completed:', processErr);
     }
+  } else if (event.type === 'payment_intent.payment_failed') {
+    const paymentIntent = event.data.object;
+    console.warn(`[Webhook Alert] Payment intent ${paymentIntent.id} failed. Reason: ${paymentIntent.last_payment_error?.message || 'unknown'}`);
   }
 
   return res.json({ received: true });

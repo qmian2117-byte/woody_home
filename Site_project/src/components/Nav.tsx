@@ -3,15 +3,17 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Phone, Menu, X, ChevronRight, ShoppingBag, Search } from "lucide-react";
+import { Phone, Menu, X, ChevronRight, ShoppingBag, Search, User } from "lucide-react";
 import type { SiteContent } from "@/app/site-content";
 import { useCart } from "@/context/CartContext";
 import { fetchSearchSuggestions } from "@/lib/api";
+import { AuthModal } from "./AuthModal";
 
 export function Nav({ site }: { site: SiteContent }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -141,6 +143,16 @@ export function Nav({ site }: { site: SiteContent }) {
 
           {/* Desktop Right Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* User Account Trigger */}
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className="p-2.5 rounded-xl text-neutral-700 hover:text-black hover:bg-neutral-100 transition-colors"
+              aria-label="Customer Account"
+              title="My Account / Sign In"
+            >
+              <User className="w-5 h-5" />
+            </button>
+
             {/* Search Trigger */}
             <div className="relative">
               <button
@@ -288,6 +300,17 @@ export function Nav({ site }: { site: SiteContent }) {
           </nav>
 
           <div className="pt-4 border-t border-[#f0f0f0] space-y-3">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setAuthModalOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 transition-all text-center text-sm"
+            >
+              <User className="w-4 h-4 text-[#C9A84C]" />
+              <span>Sign In / My Account</span>
+            </button>
+
             <Link
               href={site.cta.href}
               onClick={() => setMobileMenuOpen(false)}
@@ -299,6 +322,9 @@ export function Nav({ site }: { site: SiteContent }) {
           </div>
         </div>
       )}
+
+      {/* Customer Authentication Modal */}
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
     </header>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { productDetailStyles as s } from "@/app/products/[slug]/style";
 import type { ProductItemData } from "@/app/products/[slug]/content";
 import { useCart } from "@/context/CartContext";
+import { ProductReviews } from "@/components/ProductReviews";
 
 interface ProductDetailPageProps {
   product: ProductItemData;
@@ -887,6 +888,14 @@ export function ProductDetailPage({ product }: ProductDetailPageProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={descActiveImg} alt="" />
         </div>
+      </div>
+
+      {/* ── Product Customer Reviews & Rating Section ── */}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px" }}>
+        <ProductReviews
+          productSlug={product.slug}
+          productTitle={product.title}
+        />
       </div>
 
       {/* ── You May Also Like Section ── */}

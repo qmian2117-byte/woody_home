@@ -8,15 +8,18 @@ import { successResponse } from '../utils/apiResponse.js';
 export const searchSuggest = async (req, res, next) => {
   try {
     const { q = '', limit = 8 } = req.query;
-    const queryTerm = q.trim();
+    const queryTerm = (q || '').toString().trim();
 
-    if (!queryTerm || queryTerm.length < 2) {
+    // Sanitize query to prevent wildcard and SQL injection exploitation (SEC-010)
+    const safeTerm = queryTerm.replace(/[%_'"\\;]/g, '').trim();
+
+    if (!safeTerm || safeTerm.length < 2) {
       return successResponse(res, 'Empty search', { results: [] });
     }
 
     const limitNum = Math.min(parseInt(limit, 10) || 8, 20);
 
-    // Search across products title, body_html, and tags
+    // Search across products title
     const { data: products, error } = await supabase
       .from('products')
       .select(`
@@ -28,7 +31,7 @@ export const searchSuggest = async (req, res, next) => {
         images:product_images(image_url, position)
       `)
       .eq('is_published', true)
-      .ilike('title', `%${queryTerm}%`)
+      .ilike('title', `%${safeTerm}%`)
       .limit(limitNum);
 
     if (error) throw error;

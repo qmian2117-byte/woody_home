@@ -276,3 +276,149 @@ export async function fetchFaqs() {
     return [];
   }
 }
+
+// ─── Coupons & Cart Discounts ─────────────────────────────────────────────
+
+export interface ApplyCouponResult {
+  coupon_code: string;
+  discount_type: string;
+  discount_value: number;
+  discount_amount: number;
+  subtotal: number;
+  final_total: number;
+}
+
+export async function apiApplyCoupon(code: string): Promise<ApplyCouponResult> {
+  const res = await fetch(`${API_BASE}/cart/apply-coupon`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ code })
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.message || 'Failed to apply coupon');
+  return json.data as ApplyCouponResult;
+}
+
+export async function apiRemoveCoupon() {
+  const res = await fetch(`${API_BASE}/cart/remove-coupon`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to remove coupon');
+  return json.data;
+}
+
+// ─── Product Reviews & Ratings ───────────────────────────────────────────
+
+export interface ApiProductReview {
+  id: string;
+  customer_name: string;
+  rating: number;
+  title?: string;
+  comment: string;
+  is_verified_buyer: boolean;
+  created_at: string;
+}
+
+export interface ProductReviewsData {
+  product_title: string;
+  total_reviews: number;
+  average_rating: number;
+  reviews: ApiProductReview[];
+}
+
+export async function fetchProductReviews(slug: string): Promise<ProductReviewsData | null> {
+  try {
+    const res = await fetch(`${API_BASE}/products/${slug}/reviews`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data || null;
+  } catch (err) {
+    console.warn(`Error fetching reviews for ${slug}:`, err);
+    return null;
+  }
+}
+
+export async function apiSubmitProductReview(slug: string, payload: {
+  customer_name: string;
+  customer_email?: string;
+  rating: number;
+  title?: string;
+  comment: string;
+}) {
+  const res = await fetch(`${API_BASE}/products/${slug}/reviews`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.message || 'Failed to submit review');
+  return json.data;
+}
+
+// ─── Customer Authentication & Account ────────────────────────────────────
+
+export interface ApiUser {
+  id: string;
+  email: string;
+  full_name: string;
+  phone?: string;
+  role: 'customer' | 'admin';
+}
+
+export async function apiRegister(payload: { email: string; password: string; full_name: string; phone?: string }) {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.message || 'Registration failed');
+  return json.data as { user: ApiUser; token: string };
+}
+
+export async function apiLogin(payload: { email: string; password: string }) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.message || 'Login failed');
+  return json.data as { user: ApiUser; token: string };
+}
+
+export async function apiGetMe(): Promise<ApiUser | null> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data?.user || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiLogout() {
+  const res = await fetch(`${API_BASE}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include'
+  });
+  const json = await res.json();
+  return json;
+}
+
+// ─── Order Tracking ───────────────────────────────────────────────────────
+
+export async function apiTrackOrder(orderNumber: string) {
+  const res = await fetch(`${API_BASE}/orders/track/${encodeURIComponent(orderNumber)}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.message || 'Order not found');
+  return json.data;
+}
+

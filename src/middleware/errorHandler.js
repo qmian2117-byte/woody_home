@@ -7,9 +7,16 @@ export const errorHandler = (err, req, res, next) => {
   console.error(`❌ [${req.method} ${req.url}] Error:`, err);
 
   const statusCode = err.statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
-  const message = err.message || 'Internal Server Error';
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  return errorResponse(res, message, err, statusCode);
+  // Prevent Information Disclosure (CWE-209 / OWASP ASVS 5.0)
+  const message = (statusCode >= 500 && isProduction)
+    ? 'An internal server error occurred. Please try again later.'
+    : (err.message || 'Internal Server Error');
+
+  const errorDetails = (statusCode >= 500 && isProduction) ? null : err;
+
+  return errorResponse(res, message, errorDetails, statusCode);
 };
 
 /**

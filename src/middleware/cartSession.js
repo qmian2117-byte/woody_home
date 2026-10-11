@@ -25,7 +25,7 @@ export const cartSessionMiddleware = async (req, res, next) => {
 
     req.cartSessionToken = sessionToken;
 
-    // 2. Fetch or create cart record in Supabase
+    // 2. Fetch cart record if it exists
     let { data: cart, error } = await supabaseAdmin
       .from('carts')
       .select('id, session_token')
@@ -36,7 +36,12 @@ export const cartSessionMiddleware = async (req, res, next) => {
       console.warn('Cart lookup warning:', error.message);
     }
 
-    if (!cart) {
+    // Lazy Cart Creation: Only insert a database row if accessing cart/checkout or state-changing routes
+    // Prevents DoS cart table exhaustion from crawlers or bots hitting public read endpoints
+    const isCartOperation = req.path.includes('/cart') || req.path.includes('/checkout');
+    const isStateChanging = ['POST', 'PUT', 'PATCH'].includes(req.method);
+
+    if (!cart && (isCartOperation || isStateChanging)) {
       const { data: newCart, error: insertError } = await supabaseAdmin
         .from('carts')
         .insert([{ session_token: sessionToken }])

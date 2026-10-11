@@ -5,7 +5,14 @@ import { salesContent } from "@/app/sales/content";
 import { salesStyles } from "@/app/sales/style";
 import { ProductCard } from "@/components/ProductCard";
 
-export function SalesPage() {
+interface SalesPageProps {
+  liveProducts?: any[];
+}
+
+export function SalesPage({ liveProducts }: SalesPageProps) {
+  const productsToDisplay = liveProducts && liveProducts.length > 0
+    ? liveProducts
+    : salesContent.saleProducts;
 
   return (
     <div className="flex flex-col w-full">
@@ -16,26 +23,29 @@ export function SalesPage() {
             className="font-[family-name:var(--font-playfair)] font-bold tracking-tight"
             style={{ color: "#4E2B13", fontSize: "44px" }}
           >
-            Products
+            All Products & Masterpieces
           </h1>
+          <p className="text-sm text-neutral-500 mt-2">
+            Explore authentic handcrafted Sheesham wood art pieces and decor
+          </p>
         </div>
       </section>
 
       {/* ═══ Sale Products Grid ═══ */}
       <section className={salesStyles.products.section}>
         <div className={salesStyles.products.grid}>
-          {salesContent.saleProducts.map((product) => (
+          {productsToDisplay.map((product) => (
             <ProductCard
-              key={product.title}
+              key={product.slug || product.title}
               title={product.title}
               price={product.price}
               comparePrice={product.comparePrice}
-              vendor={product.vendor}
-              image={product.image}
-              href={product.href}
+              vendor={product.vendor || 'Woody Home'}
+              image={product.image || product.primary_image}
+              href={product.href || `/products/${product.slug}`}
               badge={product.badge}
-              rating={product.rating}
-              reviewCount={product.reviewCount}
+              rating={product.rating || 5}
+              reviewCount={product.reviewCount || 240}
               savePercent={product.savePercent}
               desktopStyle={11}
               mobileStyle={11}

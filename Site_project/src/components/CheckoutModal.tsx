@@ -8,11 +8,18 @@ import { apiCreateOrder, apiCreateStripeSession } from '@/lib/api';
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialMethod?: 'COD' | 'STRIPE';
 }
 
-export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, initialMethod = 'COD' }: CheckoutModalProps) {
   const { cart, refreshCart } = useCart();
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'STRIPE'>('COD');
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'STRIPE'>(initialMethod);
+
+  React.useEffect(() => {
+    if (initialMethod) {
+      setPaymentMethod(initialMethod);
+    }
+  }, [initialMethod, isOpen]);
   const [formData, setFormData] = useState({
     customer_name: '',
     phone: '',

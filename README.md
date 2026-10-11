@@ -102,9 +102,50 @@ npm run dev:frontend
 ### 3. Checkout & Payment
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `POST` | `/api/checkout/order` | Place Cash on Delivery (COD) order & generate WhatsApp link |
+| `POST` | `/api/checkout/order` | Place Cash on Delivery (COD) order with coupon deduction, WhatsApp link & email |
 | `POST` | `/api/checkout/stripe-session` | Initialize Stripe checkout session |
 | `GET`  | `/api/checkout/stripe-verify/:id` | Verify card payment & finalize order |
+| `GET`  | `/api/orders/track/:order_number` | Live order status tracking |
+
+### 4. Coupons & Cart Discounts
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/cart/apply-coupon` | Validate & apply coupon code (`{ "code": "EID10" }`) |
+| `DELETE`| `/api/cart/remove-coupon` | Remove coupon from active cart |
+| `GET`  | `/api/admin/coupons` | [Admin] List all discount coupons |
+| `POST` | `/api/admin/coupons` | [Admin] Create percentage or fixed discount coupon |
+| `DELETE`| `/api/admin/coupons/:id` | [Admin] Delete coupon |
+
+### 5. Product Reviews & Ratings
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET`  | `/api/products/:slug/reviews` | Retrieve approved reviews with average rating |
+| `POST` | `/api/products/:slug/reviews` | Submit a customer rating and review |
+| `GET`  | `/api/admin/reviews` | [Admin] Review moderation list |
+| `PATCH`| `/api/admin/reviews/:id/approve` | [Admin] Toggle review approval status |
+| `DELETE`| `/api/admin/reviews/:id` | [Admin] Delete spam/inappropriate review |
+
+### 6. Customer & Admin Identity (IAM & RBAC)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Register new account with password hashing |
+| `POST` | `/api/auth/login` | Login with email & password, returns JWT token |
+| `GET`  | `/api/auth/me` | Fetch authenticated user profile |
+| `GET`  | `/api/auth/orders` | Fetch customer's personal order history |
+| `POST` | `/api/auth/logout` | Clear authentication session |
+
+### 7. Protected Admin Management
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/admin/products` | [Admin] Create product with variants, images, & tags |
+| `PUT`  | `/api/admin/products/:id` | [Admin] Update product metadata & pricing |
+| `DELETE`| `/api/admin/products/:id` | [Admin] Delete/archive product |
+| `PATCH`| `/api/admin/variants/:id/inventory` | [Admin] Update stock quantity & price |
+| `POST` | `/api/admin/categories` | [Admin] Create collection/category |
+| `PUT`  | `/api/admin/categories/:id` | [Admin] Update category |
+| `DELETE`| `/api/admin/categories/:id` | [Admin] Delete category |
+| `GET`  | `/api/admin/orders` | [Admin] Paginated order list with search & status filters |
+| `PATCH`| `/api/admin/orders/:id/status` | [Admin] Update order fulfillment status |
 
 ---
 
@@ -112,5 +153,6 @@ npm run dev:frontend
 
 - **TypeScript Strict Checking**: Frontend validated with `npm run build`
 - **Unit & Integration Tests**: Run with `npm test`
-- **Security**: Helmet HTTP headers, express rate limiting, protected `.env` credentials
+- **Security**: Helmet HTTP headers, express rate limiting, JWT + bcrypt authentication
 - **Responsive Aesthetics**: Tailored gold/charcoal palette with high-contrast typography
+

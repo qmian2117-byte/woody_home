@@ -2,15 +2,64 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, Tag, CheckCircle2, CreditCard, Truck } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { CheckoutModal } from './CheckoutModal';
 
 export function CartDrawer() {
-  const { cart, isOpen, closeCart, updateItem, removeItem, isLoading } = useCart();
+  const {
+    cart,
+    coupon,
+    isOpen,
+    closeCart,
+    updateItem,
+    removeItem,
+    applyCouponCode,
+    removeCouponCode,
+    isLoading
+  } = useCart();
+
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [checkoutMethod, setCheckoutMethod] = useState<'COD' | 'STRIPE'>('STRIPE');
+  const [promoInput, setPromoInput] = useState('');
+  const [promoError, setPromoError] = useState('');
+  const [promoSuccess, setPromoSuccess] = useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoInput.trim()) return;
+
+    setPromoError('');
+    setPromoSuccess('');
+    setIsApplyingPromo(true);
+
+    try {
+      const res = await applyCouponCode(promoInput.trim());
+      setPromoSuccess(`Applied: Rs. ${res.discount_amount.toLocaleString()} discount!`);
+      setPromoInput('');
+    } catch (err: any) {
+      setPromoError(err.message || 'Invalid coupon code');
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
+  const handleRemoveCoupon = async () => {
+    setPromoError('');
+    setPromoSuccess('');
+    try {
+      await removeCouponCode();
+    } catch (err: any) {
+      setPromoError(err.message || 'Failed to remove coupon');
+    }
+  };
+
+  const subtotal = cart?.total_price || 0;
+  const discount = coupon?.discount_amount || 0;
+  const finalTotal = Math.max(0, subtotal - discount);
 
   return (
     <>
@@ -40,20 +89,12 @@ export function CartDrawer() {
               </button>
             </div>
 
-            {/* Free Shipping Progress bar */}
-            <div className="bg-[#f9f9f7] px-5 py-2.5 border-b border-neutral-200 text-xs flex items-center justify-between">
-              <span className="text-neutral-600 font-medium">Delivery:</span>
-              <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Free Nationwide Delivery (COD)
-              </span>
-            </div>
-
             {/* Cart Items List */}
             <div className="flex-1 overflow-y-auto p-5 divide-y divide-neutral-100">
               {cart?.items && cart.items.length > 0 ? (
                 cart.items.map((item) => (
                   <div key={item.id} className="py-4 first:pt-0 last:pb-0 flex gap-4">
-                    {/* Item Image */}
+                    {/* Item Thumbnail */}
                     <div className="w-20 h-20 bg-neutral-100 rounded-xl overflow-hidden shrink-0 border border-neutral-200">
                       {item.image_url ? (
                         <img
@@ -62,19 +103,19 @@ export function CartDrawer() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-neutral-400 text-xs">
-                          Woodcraft
+                        <div className="w-full h-full flex items-center justify-center text-neutral-400">
+                          <ShoppingBag className="w-6 h-6" />
                         </div>
                       )}
                     </div>
 
                     {/* Item Details */}
-                    <div className="flex-1 flex flex-col justify-between">
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
                       <div>
                         <Link
                           href={`/products/${item.product_slug}`}
                           onClick={closeCart}
-                          className="text-xs font-extrabold text-neutral-900 hover:text-[#C9A84C] line-clamp-2 transition-colors"
+                          className="text-sm font-bold text-neutral-900 hover:text-[#C9A84C] transition-colors line-clamp-1"
                         >
                           {item.product_title}
                         </Link>
@@ -157,26 +198,104 @@ export function CartDrawer() {
               )}
             </div>
 
-            {/* Footer Summary */}
+            {/* Footer Summary & Coupon Section */}
             {cart?.items && cart.items.length > 0 && (
               <div className="p-5 border-t border-neutral-100 bg-[#fbfbf9] space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-500 font-medium">Subtotal</span>
-                  <span className="font-black text-neutral-900 text-base">
-                    Rs. {(cart.total_price || 0).toLocaleString()}
-                  </span>
+                {/* Promo Code Input or Applied Badge */}
+                <div className="pt-1 pb-2">
+                  {coupon ? (
+                    <div className="flex items-center justify-between p-2.5 bg-[#C9A84C]/15 border border-[#C9A84C]/30 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <Tag className="w-4 h-4 text-[#8f742f]" />
+                        <span className="text-xs font-bold text-[#8f742f]">
+                          Code: <strong>{coupon.coupon_code}</strong> (-Rs. {coupon.discount_amount.toLocaleString()})
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleRemoveCoupon}
+                        className="text-xs text-neutral-500 hover:text-red-600 font-semibold transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          placeholder="Promo or Voucher Code"
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-neutral-200 rounded-xl uppercase tracking-wider focus:outline-none focus:border-[#C9A84C] bg-white font-mono"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isApplyingPromo || !promoInput.trim()}
+                        className="px-3.5 py-2 bg-neutral-900 text-white text-xs font-bold rounded-xl hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                      >
+                        {isApplyingPromo ? 'Applying...' : 'Apply'}
+                      </button>
+                    </form>
+                  )}
+
+                  {promoError && (
+                    <p className="text-[11px] text-red-500 font-medium mt-1.5">{promoError}</p>
+                  )}
+                  {promoSuccess && (
+                    <p className="text-[11px] text-emerald-600 font-medium mt-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {promoSuccess}
+                    </p>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => {
-                    closeCart();
-                    setCheckoutModalOpen(true);
-                  }}
-                  className="w-full py-3.5 rounded-xl font-black text-sm text-[#111] bg-[#C9A84C] hover:bg-[#e8c96b] shadow-lg shadow-[#C9A84C]/25 transition-all flex items-center justify-center gap-2 group"
-                >
-                  <span>Proceed to Cash on Delivery</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
+                {/* Subtotal & Discounts */}
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-neutral-600">
+                    <span>Subtotal</span>
+                    <span>Rs. {subtotal.toLocaleString()}</span>
+                  </div>
+                  {coupon && (
+                    <div className="flex items-center justify-between text-emerald-600 font-bold">
+                      <span>Discount</span>
+                      <span>- Rs. {discount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-sm pt-2 border-t border-neutral-200">
+                    <span className="font-bold text-neutral-900">Total</span>
+                    <span className="font-black text-neutral-900 text-base">
+                      Rs. {finalTotal.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dual Checkout Action Buttons: Stripe & COD */}
+                <div className="space-y-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setCheckoutMethod('STRIPE');
+                      closeCart();
+                      setCheckoutModalOpen(true);
+                    }}
+                    className="w-full py-3.5 rounded-xl font-black text-sm text-[#111] bg-[#C9A84C] hover:bg-[#e8c96b] shadow-lg shadow-[#C9A84C]/25 transition-all flex items-center justify-center gap-2 group"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Pay with Card / Stripe</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCheckoutMethod('COD');
+                      closeCart();
+                      setCheckoutModalOpen(true);
+                    }}
+                    className="w-full py-3 rounded-xl font-bold text-xs text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Truck className="w-4 h-4 text-neutral-600" />
+                    <span>Cash on Delivery (COD)</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -187,6 +306,7 @@ export function CartDrawer() {
       <CheckoutModal
         isOpen={checkoutModalOpen}
         onClose={() => setCheckoutModalOpen(false)}
+        initialMethod={checkoutMethod}
       />
     </>
   );

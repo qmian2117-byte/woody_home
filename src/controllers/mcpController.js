@@ -12,23 +12,26 @@ export const handleMcp = async (req, res, next) => {
 
     // Check if this is an MCP tool call
     const toolName = name || 'search_shop_policies_and_faqs';
-    const searchQuery = (query || req.body?.arguments?.query || '').trim();
+    const rawQuery = (query || req.body?.arguments?.query || '').trim();
 
-    if (!searchQuery) {
+    if (!rawQuery) {
       return errorResponse(res, 'Missing search query', null, 400);
     }
+
+    // Sanitize query to prevent PostgREST filter injection / syntax breakage
+    const safeQuery = rawQuery.replace(/[(),."';:%]/g, ' ').trim();
 
     // 1. Search policies in Supabase
     const { data: policies } = await supabase
       .from('store_policies')
       .select('type, title, content')
-      .or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
+      .or(`title.ilike.%${safeQuery}%,content.ilike.%${safeQuery}%`);
 
     // 2. Search FAQs in Supabase
     const { data: faqs } = await supabase
       .from('store_faqs')
       .select('question, answer, category')
-      .or(`question.ilike.%${searchQuery}%,answer.ilike.%${searchQuery}%`);
+      .or(`question.ilike.%${safeQuery}%,answer.ilike.%${safeQuery}%`);
 
     // 3. Construct intelligent context response
     const results = [];
